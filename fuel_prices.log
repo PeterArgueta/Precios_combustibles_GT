@@ -88,3 +88,6 @@ requests.exceptions.ConnectionError: HTTPSConnectionPool(host='mem.gob.gt', port
 2026-03-17 22:46:39,618 | INFO | Enlace del MEM detectado: texto='Precios diarios de combustibles' | href=https://mem.gob.gt/wp-content/uploads/2026/03/PRECIOS-PROMEDIO-NACIONALES-DIARIOS-2026-03-12.xlsx
 2026-03-17 22:46:40,114 | INFO | CSV histórico actualizado con 9485 filas desde https://mem.gob.gt/wp-content/uploads/2026/03/PRECIOS-PROMEDIO-NACIONALES-DIARIOS-2026-03-12.xlsx
 2026-03-17 22:46:40,181 | INFO | Actualización completada. Filas: 9485 | Fuente: https://mem.gob.gt/wp-content/uploads/2026/03/PRECIOS-PROMEDIO-NACIONALES-DIARIOS-2026-03-12.xlsx
+2026-03-18 15:35:06,594 | INFO | Enlace del MEM detectado: texto='Precios diarios de combustibles' | href=https://mem.gob.gt/wp-content/uploads/2026/03/Precios-Promedio-Nacionales-Diarios-2026-1-1.xlsx
+2026-03-18 15:35:07,213 | INFO | CSV histórico actualizado con 9510 filas desde https://mem.gob.gt/wp-content/uploads/2026/03/Precios-Promedio-Nacionales-Diarios-2026-1-1.xlsx
+2026-03-18 15:35:07,279 | INFO | Actualización completada. Filas: 9510 | Fuente: https://mem.gob.gt/wp-content/uploads/2026/03/Precios-Promedio-Nacionales-Diarios-2026-1-1.xlsx
