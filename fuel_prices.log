@@ -97,3 +97,9 @@ requests.exceptions.ConnectionError: HTTPSConnectionPool(host='mem.gob.gt', port
 2026-03-20 18:21:45,898 | INFO | Enlace del MEM detectado: texto='Precios diarios de combustibles' | href=https://mem.gob.gt/wp-content/uploads/2026/03/Precios-Promedio-Nacionales-Diarios-2026-1-1.xlsx
 2026-03-20 18:21:46,532 | INFO | CSV histórico actualizado con 9510 filas desde https://mem.gob.gt/wp-content/uploads/2026/03/Precios-Promedio-Nacionales-Diarios-2026-1-1.xlsx
 2026-03-20 18:21:46,597 | INFO | Actualización completada. Filas: 9510 | Fuente: https://mem.gob.gt/wp-content/uploads/2026/03/Precios-Promedio-Nacionales-Diarios-2026-1-1.xlsx
+2026-03-20 19:20:31,265 | INFO | Histórico existente: 9510 filas
+2026-03-20 19:20:31,676 | INFO | API MEM: 3 filas extraídas para fecha 2026-03-19 (tipo_cambio=Q7.663)
+2026-03-20 19:20:31,750 | INFO | URL del Excel obtenida vía API: https://mem.gob.gt/wp-content/uploads/2026/03/Precios-Promedio-Nacionales-Diarios-2026-1-1.xlsx
+2026-03-20 19:20:32,292 | INFO | Excel MEM: 9510 filas extraídas
+2026-03-20 19:20:32,342 | INFO | CSV actualizado: 9513 filas totales (3 nuevas) | fuente Excel: https://mem.gob.gt/wp-content/uploads/2026/03/Precios-Promedio-Nacionales-Diarios-2026-1-1.xlsx
+2026-03-20 19:20:32,408 | INFO | Actualización completada. Filas: 9513 | Fuente: https://mem.gob.gt/wp-content/uploads/2026/03/Precios-Promedio-Nacionales-Diarios-2026-1-1.xlsx
