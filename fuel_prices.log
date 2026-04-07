@@ -175,3 +175,9 @@ requests.exceptions.ConnectionError: HTTPSConnectionPool(host='mem.gob.gt', port
 2026-04-06 21:10:21,083 | INFO | Excel MEM: 9575 filas extraídas
 2026-04-06 21:10:21,121 | INFO | CSV actualizado: 9578 filas totales (3 nuevas) | fuente Excel: https://mem.gob.gt/wp-content/uploads/2026/03/Precios-Promedio-Nacionales-Diarios-2026-3.xlsx
 2026-04-06 21:10:21,181 | INFO | Actualización completada. Filas: 9578 | Fuente: https://mem.gob.gt/wp-content/uploads/2026/03/Precios-Promedio-Nacionales-Diarios-2026-3.xlsx
+2026-04-07 15:01:39,759 | INFO | Histórico existente: 9578 filas
+2026-04-07 15:01:40,556 | INFO | API MEM: 3 filas extraídas para fecha 2026-04-06 (tipo_cambio=Q7.663)
+2026-04-07 15:01:40,648 | INFO | URL del Excel obtenida vía API: https://mem.gob.gt/wp-content/uploads/2026/03/Precios-Promedio-Nacionales-Diarios-2026-3.xlsx
+2026-04-07 15:01:40,901 | INFO | Excel MEM: 9575 filas extraídas
+2026-04-07 15:01:40,939 | INFO | CSV actualizado: 9578 filas totales (0 nuevas) | fuente Excel: https://mem.gob.gt/wp-content/uploads/2026/03/Precios-Promedio-Nacionales-Diarios-2026-3.xlsx
+2026-04-07 15:01:41,001 | INFO | Actualización completada. Filas: 9578 | Fuente: https://mem.gob.gt/wp-content/uploads/2026/03/Precios-Promedio-Nacionales-Diarios-2026-3.xlsx
