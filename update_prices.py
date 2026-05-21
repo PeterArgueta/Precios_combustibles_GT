@@ -1,8 +1,9 @@
-
 from __future__ import annotations
 
 import logging
 from pathlib import Path
+
+import requests
 
 import build_dashboard
 import scraper
@@ -25,6 +26,17 @@ def main() -> int:
         build_dashboard.main("precios_historicos.csv", "index.html")
         logging.info("Actualización completada. Filas: %s | Fuente: %s", len(df), source_url)
         return 0
+    except requests.exceptions.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else None
+        if status == 403:
+            logging.warning(
+                "El sitio del MEM bloqueó el acceso (403 Forbidden). "
+                "Es probable que estén bloqueando IPs de servidores CI/CD temporalmente. "
+                "Se omite la actualización de hoy sin marcar el workflow como fallido."
+            )
+            return 0  # No falla el workflow — el bloqueo es externo, no un bug
+        logging.exception("Error HTTP inesperado (%s): %s", status, exc)
+        return 1
     except Exception as exc:
         logging.exception("Falló la actualización diaria: %s", exc)
         return 1
