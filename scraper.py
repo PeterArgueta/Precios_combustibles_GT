@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import logging
 import re
+import time
 import unicodedata
 from pathlib import Path
 from urllib.parse import urljoin
@@ -10,6 +11,8 @@ from urllib.parse import urljoin
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -356,18 +359,51 @@ def save_csv(df: pd.DataFrame, output_csv: str | Path = OUTPUT_CSV) -> Path:
 
 # ── Orquestador principal ─────────────────────────────────────────────────────
 
+def _build_session() -> requests.Session:
+    """Crea una sesión HTTP que imita un navegador real, con reintentos automáticos."""
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": (
+            "text/html,application/xhtml+xml,application/xml;"
+            "q=0.9,image/avif,image/webp,*/*;q=0.8"
+        ),
+        "Accept-Language": "es-GT,es;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+    })
+    retry = Retry(
+        total=5,
+        backoff_factor=2,           # espera 2s, 4s, 8s, 16s…
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET", "HEAD"],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
 def run(output_csv: str | Path = OUTPUT_CSV) -> tuple[pd.DataFrame, str]:
     """Actualiza el CSV histórico combinando API y Excel del MEM.
 
     Retorna (DataFrame final, URL del Excel usado) — compatible con update_prices.py.
     """
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/122.0 Safari/537.36"
-        )
-    })
+    session = _build_session()
+
+    # Warm-up: visita la página principal para obtener cookies de sesión
+    # antes de hacer requests a páginas internas
+    try:
+        session.get("https://mem.gob.gt/", timeout=15)
+        time.sleep(1)
+    except Exception:
+        pass  # Si falla el warm-up, continuamos igual
 
     # 1. Histórico existente
     existing = load_existing_csv(output_csv)
