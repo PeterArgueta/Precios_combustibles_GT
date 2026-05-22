@@ -353,3 +353,8 @@ requests.exceptions.ConnectionError: HTTPSConnectionPool(host='mem.gob.gt', port
 2026-05-21 16:57:53,801 | WARNING | No se pudo extraer URL del Excel vía API: 403 Client Error: Forbidden for url: https://mem.gob.gt/wp-json/wp/v2/pages/45428
 2026-05-21 16:57:53,802 | INFO | Fallback: buscando Excel en página HTML del MEM…
 2026-05-21 16:57:53,844 | WARNING | El sitio del MEM bloqueó el acceso (403 Forbidden). Es probable que estén bloqueando IPs de servidores CI/CD temporalmente. Se omite la actualización de hoy sin marcar el workflow como fallido.
+2026-05-22 16:18:14,571 | INFO | Histórico existente: 9760 filas
+2026-05-22 16:18:14,656 | WARNING | API MEM no disponible: 403 Client Error: Forbidden for url: https://mem.gob.gt/wp-json/wp/v2/pages/45428
+2026-05-22 16:18:14,740 | WARNING | No se pudo extraer URL del Excel vía API: 403 Client Error: Forbidden for url: https://mem.gob.gt/wp-json/wp/v2/pages/45428
+2026-05-22 16:18:14,740 | INFO | Fallback: buscando Excel en página HTML del MEM…
+2026-05-22 16:18:14,807 | WARNING | El sitio del MEM bloqueó el acceso (403 Forbidden). Es probable que estén bloqueando IPs de servidores CI/CD temporalmente. Se omite la actualización de hoy sin marcar el workflow como fallido.
