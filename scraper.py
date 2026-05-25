@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
 import os
 import re
@@ -69,20 +70,18 @@ def _get_mem(url: str, session: requests.Session, **kwargs) -> requests.Response
         LOGGER.info("Request vía proxy Cloudflare: %s", fetch_url)
     else:
         fetch_url = url
-    return session.get(fetch_url, **kwargs)
+    resp = session.get(fetch_url, **kwargs)
+    resp.encoding = "utf-8"
+    return resp
 
 # ── Fuente 1: API WordPress REST ──────────────────────────────────────────────
 
 def fetch_api_rows(session: requests.Session) -> pd.DataFrame:
-    """Extrae el 'Monitoreo Actual' del endpoint WP REST del MEM.
-
-    Devuelve DataFrame con columnas: fecha, combustible, precio, tipo_cambio.
-    Si falla o no hay datos parseables, devuelve DataFrame vacío sin lanzar error.
-    """
+    """Extrae el 'Monitoreo Actual' del endpoint WP REST del MEM."""
     try:
         resp = _get_mem(MEM_API_URL, session, timeout=30)
         resp.raise_for_status()
-        data = resp.json()
+        data = json.loads(resp.text)
     except Exception as exc:
         LOGGER.warning("API MEM no disponible: %s", exc)
         return pd.DataFrame(columns=["fecha", "combustible", "precio", "tipo_cambio"])
@@ -185,7 +184,8 @@ def _find_excel_url_raw(session: requests.Session) -> str:
     try:
         resp = _get_mem(MEM_API_URL, session, timeout=30)
         resp.raise_for_status()
-        html = resp.json().get("content", {}).get("rendered", "")
+        data = json.loads(resp.text)
+        html = data.get("content", {}).get("rendered", "")
         soup = BeautifulSoup(html, "html.parser")
         for anchor in soup.find_all("a", href=True):
             href = str(anchor["href"]).strip()
@@ -454,7 +454,6 @@ def run(output_csv: str | Path = OUTPUT_CSV) -> tuple[pd.DataFrame, str]:
         status = exc.response.status_code if exc.response is not None else None
         LOGGER.warning("Error HTTP %s al descargar Excel del MEM.", status)
 
-        # Fallback: intentar con URL cacheada
         cached_url = _load_cached_excel_url()
         if cached_url and cached_url != excel_url:
             LOGGER.info("Reintentando con URL cacheada: %s", cached_url)
