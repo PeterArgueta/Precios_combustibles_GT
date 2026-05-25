@@ -17,9 +17,9 @@ from urllib3.util.retry import Retry
 
 # ── Constantes ────────────────────────────────────────────────────────────────
 
-MEM_PAGE_URL = "https://mem.gob.gt/que-hacemos/hidrocarburos/comercializacion-downstream/precios-combustible-nacionales/"
-MEM_API_URL  = "https://mem.gob.gt/wp-json/wp/v2/pages/45428"
-OUTPUT_CSV   = "precios_historicos.csv"
+MEM_PAGE_URL    = "https://mem.gob.gt/que-hacemos/hidrocarburos/comercializacion-downstream/precios-combustible-nacionales/"
+MEM_API_URL     = "https://mem.gob.gt/wp-json/wp/v2/pages/45428"
+OUTPUT_CSV      = "precios_historicos.csv"
 EXCEL_URL_CACHE = "last_excel_url.txt"
 
 LOGGER = logging.getLogger(__name__)
@@ -59,16 +59,28 @@ def _norm_text(value: object) -> str:
     text = re.sub(r"\s+", " ", text)
     return text
 
-# ── Fuente 1: API WordPress REST ─────────────────────────────────────────────
+# ── Proxy helper ──────────────────────────────────────────────────────────────
+
+def _get_mem(url: str, session: requests.Session, **kwargs) -> requests.Response:
+    """Hace GET a una URL del MEM, usando proxy Cloudflare si está configurado."""
+    proxy_base = os.environ.get("CLOUDFLARE_PROXY_URL", "").strip()
+    if proxy_base and "mem.gob.gt" in url:
+        fetch_url = f"{proxy_base}?url={url}"
+        LOGGER.info("Request vía proxy Cloudflare: %s", fetch_url)
+    else:
+        fetch_url = url
+    return session.get(fetch_url, **kwargs)
+
+# ── Fuente 1: API WordPress REST ──────────────────────────────────────────────
 
 def fetch_api_rows(session: requests.Session) -> pd.DataFrame:
     """Extrae el 'Monitoreo Actual' del endpoint WP REST del MEM.
 
     Devuelve DataFrame con columnas: fecha, combustible, precio, tipo_cambio.
-    Si falla o no hay datos parseable, devuelve DataFrame vacío sin lanzar error.
+    Si falla o no hay datos parseables, devuelve DataFrame vacío sin lanzar error.
     """
     try:
-        resp = session.get(MEM_API_URL, timeout=30)
+        resp = _get_mem(MEM_API_URL, session, timeout=30)
         resp.raise_for_status()
         data = resp.json()
     except Exception as exc:
@@ -99,15 +111,15 @@ def fetch_api_rows(session: requests.Session) -> pd.DataFrame:
         LOGGER.warning("API MEM: no se encontraron tablas en content.rendered.")
         return pd.DataFrame(columns=["fecha", "combustible", "precio", "tipo_cambio"])
 
-    table = tables[0]
+    table     = tables[0]
     rows_html = table.find_all("tr")
     if not rows_html:
         return pd.DataFrame(columns=["fecha", "combustible", "precio", "tipo_cambio"])
 
     # ── Detectar columna "Monitoreo Actual" y su fecha ───────────────────────
-    header_cells = [td.get_text(strip=True) for td in rows_html[0].find_all(["td", "th"])]
+    header_cells   = [td.get_text(strip=True) for td in rows_html[0].find_all(["td", "th"])]
     fecha_actual: pd.Timestamp | None = None
-    actual_col_idx: int | None = None
+    actual_col_idx: int | None        = None
 
     for i, cell in enumerate(header_cells):
         m = re.search(r"Monitoreo Actual[^:]*:\s*(\d{2}/\d{2}/\d{4})", cell, re.IGNORECASE)
@@ -151,7 +163,7 @@ def fetch_api_rows(session: requests.Session) -> pd.DataFrame:
     df = pd.DataFrame(records)
     LOGGER.info(
         "API MEM: %s filas extraídas para fecha %s (tipo_cambio=Q%s)",
-        len(df), fecha_actual.strftime("%Y-%m-%d"), tipo_cambio
+        len(df), fecha_actual.strftime("%Y-%m-%d"), tipo_cambio,
     )
     return df
 
@@ -171,7 +183,7 @@ def _find_excel_url_raw(session: requests.Session) -> str:
 
     # Intento 1: extraer URL directamente del JSON de la API
     try:
-        resp = session.get(MEM_API_URL, timeout=30)
+        resp = _get_mem(MEM_API_URL, session, timeout=30)
         resp.raise_for_status()
         html = resp.json().get("content", {}).get("rendered", "")
         soup = BeautifulSoup(html, "html.parser")
@@ -183,9 +195,9 @@ def _find_excel_url_raw(session: requests.Session) -> str:
     except Exception as exc:
         LOGGER.warning("No se pudo extraer URL del Excel vía API: %s", exc)
 
-    # Intento 2: scraping de la página HTML (comportamiento original)
+    # Intento 2: scraping de la página HTML
     LOGGER.info("Fallback: buscando Excel en página HTML del MEM…")
-    response = session.get(MEM_PAGE_URL, timeout=60)
+    response = _get_mem(MEM_PAGE_URL, session, timeout=60)
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
 
@@ -230,16 +242,14 @@ def find_excel_url(session: requests.Session) -> str:
 
 
 def download_excel_bytes(url: str, session: requests.Session) -> bytes:
-    """Descarga el Excel. Si hay CLOUDFLARE_PROXY_URL en el entorno, lo usa como proxy."""
+    """Descarga el Excel usando proxy Cloudflare si está configurado."""
     proxy_base = os.environ.get("CLOUDFLARE_PROXY_URL", "").strip()
-
     if proxy_base:
         fetch_url = f"{proxy_base}?url={url}"
         LOGGER.info("Descargando Excel vía proxy Cloudflare: %s", fetch_url)
     else:
         fetch_url = url
         LOGGER.info("Descargando Excel directo: %s", fetch_url)
-
     response = session.get(fetch_url, timeout=120)
     response.raise_for_status()
     return response.content
@@ -418,7 +428,7 @@ def run(output_csv: str | Path = OUTPUT_CSV) -> tuple[pd.DataFrame, str]:
 
     # Warm-up: visita la página principal para obtener cookies de sesión
     try:
-        session.get("https://mem.gob.gt/", timeout=15)
+        _get_mem("https://mem.gob.gt/", session, timeout=15)
         time.sleep(1)
     except Exception:
         pass
@@ -444,7 +454,7 @@ def run(output_csv: str | Path = OUTPUT_CSV) -> tuple[pd.DataFrame, str]:
         status = exc.response.status_code if exc.response is not None else None
         LOGGER.warning("Error HTTP %s al descargar Excel del MEM.", status)
 
-        # Fallback: intentar con URL cacheada si la URL actual falló
+        # Fallback: intentar con URL cacheada
         cached_url = _load_cached_excel_url()
         if cached_url and cached_url != excel_url:
             LOGGER.info("Reintentando con URL cacheada: %s", cached_url)
@@ -464,10 +474,10 @@ def run(output_csv: str | Path = OUTPUT_CSV) -> tuple[pd.DataFrame, str]:
     except Exception as exc:
         LOGGER.warning("Error inesperado al procesar Excel: %s", exc)
 
-    # 4. Merge con prioridad Excel > API > Histórico
+    # 4. Merge con prioridad Excel > API > Histórico (siempre se ejecuta)
     final_df = merge_sources(existing, api_df, excel_df)
 
-    # 5. Guardar (siempre se ejecuta)
+    # 5. Guardar
     save_csv(final_df, output_csv)
 
     nuevas = len(final_df) - len(existing)
