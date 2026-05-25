@@ -81,6 +81,10 @@ def fetch_api_rows(session: requests.Session) -> pd.DataFrame:
     try:
         resp = _get_mem(MEM_API_URL, session, timeout=30)
         resp.raise_for_status()
+        LOGGER.info(
+            "API raw | status: %s | encoding: %s | bytes: %s | preview: %s",
+            resp.status_code, resp.encoding, len(resp.content), repr(resp.text[:300]),
+        )
         data = json.loads(resp.text)
     except Exception as exc:
         LOGGER.warning("API MEM no disponible: %s", exc)
