@@ -70,8 +70,11 @@ def _get_mem(url: str, session: requests.Session, **kwargs) -> requests.Response
         LOGGER.info("Request vía proxy Cloudflare: %s", fetch_url)
     else:
         fetch_url = url
+    kwargs.setdefault("stream", False)
     resp = session.get(fetch_url, **kwargs)
+    _ = resp.content  # fuerza descarga completa del body
     resp.encoding = "utf-8"
+    LOGGER.info("_get_mem | status=%s | bytes=%s", resp.status_code, len(resp.content))
     return resp
 
 # ── Fuente 1: API WordPress REST ──────────────────────────────────────────────
@@ -81,11 +84,10 @@ def fetch_api_rows(session: requests.Session) -> pd.DataFrame:
     try:
         resp = _get_mem(MEM_API_URL, session, timeout=30)
         resp.raise_for_status()
-        LOGGER.info(
-            "API raw | status: %s | encoding: %s | bytes: %s | preview: %s",
-            resp.status_code, resp.encoding, len(resp.content), repr(resp.text[:300]),
-        )
-        data = json.loads(resp.text)
+        raw_text = resp.content.decode("utf-8", errors="replace")
+        LOGGER.info("API raw | status=%s | bytes=%s | preview=%s",
+                    resp.status_code, len(resp.content), repr(raw_text[:200]))
+        data = json.loads(raw_text)
     except Exception as exc:
         LOGGER.warning("API MEM no disponible: %s", exc)
         return pd.DataFrame(columns=["fecha", "combustible", "precio", "tipo_cambio"])
@@ -188,7 +190,7 @@ def _find_excel_url_raw(session: requests.Session) -> str:
     try:
         resp = _get_mem(MEM_API_URL, session, timeout=30)
         resp.raise_for_status()
-        data = json.loads(resp.text)
+        data = json.loads(resp.content.decode("utf-8", errors="replace"))
         html = data.get("content", {}).get("rendered", "")
         soup = BeautifulSoup(html, "html.parser")
         for anchor in soup.find_all("a", href=True):
