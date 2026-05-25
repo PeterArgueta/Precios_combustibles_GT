@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 import re
 import time
 import unicodedata
@@ -19,6 +20,7 @@ from urllib3.util.retry import Retry
 MEM_PAGE_URL = "https://mem.gob.gt/que-hacemos/hidrocarburos/comercializacion-downstream/precios-combustible-nacionales/"
 MEM_API_URL  = "https://mem.gob.gt/wp-json/wp/v2/pages/45428"
 OUTPUT_CSV   = "precios_historicos.csv"
+EXCEL_URL_CACHE = "last_excel_url.txt"
 
 LOGGER = logging.getLogger(__name__)
 
@@ -155,11 +157,18 @@ def fetch_api_rows(session: requests.Session) -> pd.DataFrame:
 
 # ── Fuente 2: Excel oficial MEM ───────────────────────────────────────────────
 
-def find_excel_url(session: requests.Session) -> str:
-    """Obtiene la URL del Excel de precios diarios.
+def _load_cached_excel_url() -> str | None:
+    """Devuelve la URL del Excel de la última corrida exitosa, o None si no existe."""
+    path = Path(EXCEL_URL_CACHE)
+    if path.exists():
+        url = path.read_text(encoding="utf-8").strip()
+        return url if url else None
+    return None
 
-    Intenta primero la API (más rápido), luego hace fallback a scraping HTML.
-    """
+
+def _find_excel_url_raw(session: requests.Session) -> str:
+    """Lógica interna para obtener la URL del Excel. No cachea."""
+
     # Intento 1: extraer URL directamente del JSON de la API
     try:
         resp = session.get(MEM_API_URL, timeout=30)
@@ -210,8 +219,28 @@ def find_excel_url(session: requests.Session) -> str:
     return best[2]
 
 
+def find_excel_url(session: requests.Session) -> str:
+    """Obtiene la URL del Excel y la cachea para futuros fallbacks."""
+    url = _find_excel_url_raw(session)
+    try:
+        Path(EXCEL_URL_CACHE).write_text(url, encoding="utf-8")
+    except OSError as exc:
+        LOGGER.warning("No se pudo cachear la URL del Excel: %s", exc)
+    return url
+
+
 def download_excel_bytes(url: str, session: requests.Session) -> bytes:
-    response = session.get(url, timeout=120)
+    """Descarga el Excel. Si hay CLOUDFLARE_PROXY_URL en el entorno, lo usa como proxy."""
+    proxy_base = os.environ.get("CLOUDFLARE_PROXY_URL", "").strip()
+
+    if proxy_base:
+        fetch_url = f"{proxy_base}?url={url}"
+        LOGGER.info("Descargando Excel vía proxy Cloudflare: %s", fetch_url)
+    else:
+        fetch_url = url
+        LOGGER.info("Descargando Excel directo: %s", fetch_url)
+
+    response = session.get(fetch_url, timeout=120)
     response.raise_for_status()
     return response.content
 
@@ -319,12 +348,6 @@ def merge_sources(
     """Combina tres fuentes con la siguiente prioridad ante conflictos:
 
     Excel (2) > API (1) > Histórico existente (0)
-
-    Reglas:
-    - fecha+combustible es la clave de deduplicación.
-    - La fuente de mayor prioridad gana en cualquier conflicto.
-    - Se agregan solo registros nuevos cuando no hay conflicto.
-    - Todo el histórico se conserva.
     """
     def tag(df: pd.DataFrame, priority: int) -> pd.DataFrame:
         df = df.copy()
@@ -337,7 +360,6 @@ def merge_sources(
     )
     combined["fecha"] = pd.to_datetime(combined["fecha"]).dt.normalize()
 
-    # Mayor prioridad al tope → keep="first" conserva la fuente ganadora
     combined = combined.sort_values("_priority", ascending=False)
     combined = combined.drop_duplicates(subset=["fecha", "combustible"], keep="first")
     combined = combined.drop(columns=["_priority"])
@@ -379,7 +401,7 @@ def _build_session() -> requests.Session:
     })
     retry = Retry(
         total=5,
-        backoff_factor=2,           # espera 2s, 4s, 8s, 16s…
+        backoff_factor=2,
         status_forcelist=[429, 500, 502, 503, 504],
         allowed_methods=["GET", "HEAD"],
         raise_on_status=False,
@@ -391,19 +413,15 @@ def _build_session() -> requests.Session:
 
 
 def run(output_csv: str | Path = OUTPUT_CSV) -> tuple[pd.DataFrame, str]:
-    """Actualiza el CSV histórico combinando API y Excel del MEM.
-
-    Retorna (DataFrame final, URL del Excel usado) — compatible con update_prices.py.
-    """
+    """Actualiza el CSV histórico combinando API y Excel del MEM."""
     session = _build_session()
 
     # Warm-up: visita la página principal para obtener cookies de sesión
-    # antes de hacer requests a páginas internas
     try:
         session.get("https://mem.gob.gt/", timeout=15)
         time.sleep(1)
     except Exception:
-        pass  # Si falla el warm-up, continuamos igual
+        pass
 
     # 1. Histórico existente
     existing = load_existing_csv(output_csv)
@@ -412,16 +430,44 @@ def run(output_csv: str | Path = OUTPUT_CSV) -> tuple[pd.DataFrame, str]:
     # 2. Fuente API (no interrumpe el flujo si falla)
     api_df = fetch_api_rows(session)
 
-    # 3. Fuente Excel
-    excel_url   = find_excel_url(session)
-    excel_bytes = download_excel_bytes(excel_url, session)
-    excel_df    = parse_workbook(excel_bytes)
-    LOGGER.info("Excel MEM: %s filas extraídas", len(excel_df))
+    # 3. Fuente Excel con fallback a URL cacheada
+    excel_df  = pd.DataFrame(columns=["fecha", "combustible", "precio", "tipo_cambio"])
+    excel_url = "(no descargado)"
+
+    try:
+        excel_url   = find_excel_url(session)
+        excel_bytes = download_excel_bytes(excel_url, session)
+        excel_df    = parse_workbook(excel_bytes)
+        LOGGER.info("Excel MEM: %s filas extraídas", len(excel_df))
+
+    except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else None
+        LOGGER.warning("Error HTTP %s al descargar Excel del MEM.", status)
+
+        # Fallback: intentar con URL cacheada si la URL actual falló
+        cached_url = _load_cached_excel_url()
+        if cached_url and cached_url != excel_url:
+            LOGGER.info("Reintentando con URL cacheada: %s", cached_url)
+            try:
+                excel_bytes = download_excel_bytes(cached_url, session)
+                excel_df    = parse_workbook(excel_bytes)
+                excel_url   = cached_url
+                LOGGER.info("Fallback exitoso: %s filas del Excel cacheado", len(excel_df))
+            except Exception as exc2:
+                LOGGER.warning("Fallback de URL cacheada también falló: %s", exc2)
+        else:
+            LOGGER.warning(
+                "Sin URL cacheada disponible. "
+                "Se actualizará solo con API + histórico existente."
+            )
+
+    except Exception as exc:
+        LOGGER.warning("Error inesperado al procesar Excel: %s", exc)
 
     # 4. Merge con prioridad Excel > API > Histórico
     final_df = merge_sources(existing, api_df, excel_df)
 
-    # 5. Guardar
+    # 5. Guardar (siempre se ejecuta)
     save_csv(final_df, output_csv)
 
     nuevas = len(final_df) - len(existing)
