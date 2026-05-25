@@ -23,9 +23,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git stash
-          git pull --rebase origin main
-          git stash pop || true
           git add precios_historicos.csv index.html fuel_prices.log last_excel_url.txt || true
           git diff --cached --quiet || git commit -m "Actualizar precios de combustibles"
+          git pull origin main --ff-only || git pull origin main --strategy-option=ours
           git push
