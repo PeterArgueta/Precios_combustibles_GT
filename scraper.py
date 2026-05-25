@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import io
 import json
 import logging
@@ -72,9 +73,13 @@ def _get_mem(url: str, session: requests.Session, **kwargs) -> requests.Response
         fetch_url = url
     kwargs.setdefault("stream", False)
     resp = session.get(fetch_url, **kwargs)
-    _ = resp.content  # fuerza descarga completa del body
+    raw = resp.content
+    if raw[:2] == b'\x1f\x8b':
+        LOGGER.info("_get_mem | descomprimiendo gzip (%s bytes)", len(raw))
+        raw = gzip.decompress(raw)
+    resp._content = raw
     resp.encoding = "utf-8"
-    LOGGER.info("_get_mem | status=%s | bytes=%s", resp.status_code, len(resp.content))
+    LOGGER.info("_get_mem | status=%s | bytes=%s", resp.status_code, len(raw))
     return resp
 
 # ── Fuente 1: API WordPress REST ──────────────────────────────────────────────
