@@ -863,3 +863,17 @@ requests.exceptions.ConnectionError: HTTPSConnectionPool(host='mem.gob.gt', port
 2026-06-28 15:12:39,596 | INFO | Excel MEM: 10010 filas extraídas
 2026-06-28 15:12:39,654 | INFO | CSV actualizado: 10010 filas totales (0 nuevas) | fuente Excel: https://mem.gob.gt/wp-content/uploads/2026/06/Precios-Promedio-Nacionales-Diarios-2026-2.xlsx
 2026-06-28 15:12:39,717 | INFO | Actualización completada. Filas: 10010 | Fuente: https://mem.gob.gt/wp-content/uploads/2026/06/Precios-Promedio-Nacionales-Diarios-2026-2.xlsx
+2026-06-29 16:49:58,023 | INFO | Request vía proxy Cloudflare: https://calm-dust-1c09.ssapanalistadedatos2024.workers.dev?url=https://mem.gob.gt/
+2026-06-29 16:49:59,266 | INFO | _get_mem | status=200 | bytes=137136
+2026-06-29 16:50:00,280 | INFO | Histórico existente: 10010 filas
+2026-06-29 16:50:00,281 | INFO | Request vía proxy Cloudflare: https://calm-dust-1c09.ssapanalistadedatos2024.workers.dev?url=https://mem.gob.gt/wp-json/wp/v2/pages/45428
+2026-06-29 16:50:00,722 | INFO | _get_mem | status=200 | bytes=31437
+2026-06-29 16:50:00,722 | INFO | API raw | status=200 | bytes=31437 | preview='{"id":45428,"date":"2020-11-19T13:29:42","date_gmt":"2020-11-19T13:29:42","guid":{"rendered":"https:\\/\\/mem.gob.gt\\/?page_id=45428"},"modified":"2026-06-26T14:00:51","modified_gmt":"2026-06-26T14:00:5'
+2026-06-29 16:50:00,728 | WARNING | API MEM: no se detectó columna 'Monitoreo Actual' con fecha.
+2026-06-29 16:50:00,729 | INFO | Request vía proxy Cloudflare: https://calm-dust-1c09.ssapanalistadedatos2024.workers.dev?url=https://mem.gob.gt/wp-json/wp/v2/pages/45428
+2026-06-29 16:50:00,822 | INFO | _get_mem | status=200 | bytes=31437
+2026-06-29 16:50:00,827 | INFO | URL del Excel obtenida vía API: https://mem.gob.gt/wp-content/uploads/2026/06/Precios-Promedio-Nacionales-Diarios-2026-2.xlsx
+2026-06-29 16:50:00,828 | INFO | Descargando Excel vía proxy Cloudflare: https://calm-dust-1c09.ssapanalistadedatos2024.workers.dev?url=https://mem.gob.gt/wp-content/uploads/2026/06/Precios-Promedio-Nacionales-Diarios-2026-2.xlsx
+2026-06-29 16:50:01,329 | INFO | Excel MEM: 10010 filas extraídas
+2026-06-29 16:50:01,383 | INFO | CSV actualizado: 10010 filas totales (0 nuevas) | fuente Excel: https://mem.gob.gt/wp-content/uploads/2026/06/Precios-Promedio-Nacionales-Diarios-2026-2.xlsx
+2026-06-29 16:50:01,445 | INFO | Actualización completada. Filas: 10010 | Fuente: https://mem.gob.gt/wp-content/uploads/2026/06/Precios-Promedio-Nacionales-Diarios-2026-2.xlsx
