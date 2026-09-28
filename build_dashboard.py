@@ -34,7 +34,7 @@ def prepare_data(csv_path: str | Path = INPUT_CSV) -> pd.DataFrame:
     df["fecha"]       = pd.to_datetime(df["fecha"], errors="coerce")
     df["precio"]      = pd.to_numeric(df["precio"], errors="coerce")
     df["combustible"] = df["combustible"].astype(str).str.strip()
-    df = df[df["fecha"].notna() & df["precio"].notna()].copy()
+    df = df[df["fecha"].notna() & df["precio"].notna() & (df["precio"] > 0)].copy()
     return df.sort_values(["combustible", "fecha"])
 
 
@@ -561,10 +561,25 @@ function renderChart() {
   const fuels = isCombinado ? ORDER : [currentFuel];
 
   const traces = fuels.map(fuel => {
-    const series  = filterSeries(parseSeries(fuel));
-    const x       = series.map(d => d.fecha.toISOString().slice(0, 10));
-    const y       = series.map(d => d.precio);
-    const hover   = series.map(d => formatDateSpanish(d.fecha));
+    const series = filterSeries(parseSeries(fuel));
+    const x = [], y = [], hover = [];
+
+    series.forEach((d, i) => {
+      if (i > 0) {
+        const prev = series[i - 1];
+        const gapDays = (d.fecha - prev.fecha) / 86400000;
+        if (gapDays > 14) {
+          const midpoint = new Date((d.fecha.getTime() + prev.fecha.getTime()) / 2);
+          x.push(midpoint.toISOString().slice(0, 10));
+          y.push(null);
+          hover.push("");
+        }
+      }
+      x.push(d.fecha.toISOString().slice(0, 10));
+      y.push(d.precio);
+      hover.push(formatDateSpanish(d.fecha));
+    });
+
     return {
       x, y,
       name:          fuel,

@@ -237,6 +237,9 @@ def fetch_api_rows(session: requests.Session) -> pd.DataFrame:
             price = float(price_str)
         except ValueError:
             continue
+        if price <= 0:
+            LOGGER.warning("API MEM: precio no positivo omitido (%s, %s)", fuel, price)
+            continue
         records.append({
             "fecha":       fecha_actual,
             "combustible": fuel,
@@ -410,7 +413,7 @@ def parse_workbook(excel_bytes: bytes) -> pd.DataFrame:
             var_name="combustible",
             value_name="precio",
         )
-        long_df = long_df[long_df["precio"].notna()].copy()
+        long_df = long_df[long_df["precio"].notna() & (long_df["precio"] > 0)].copy()
         frames.append(long_df)
 
     if not frames:
@@ -435,7 +438,10 @@ def load_existing_csv(csv_path: str | Path = OUTPUT_CSV) -> pd.DataFrame:
     df["fecha"]       = pd.to_datetime(df["fecha"], errors="coerce")
     df["precio"]      = pd.to_numeric(df["precio"], errors="coerce")
     df["tipo_cambio"] = pd.to_numeric(df["tipo_cambio"], errors="coerce")
-    return df[df["fecha"].notna()].copy()
+    invalid = df["precio"].isna() | (df["precio"] <= 0)
+    if invalid.any():
+        LOGGER.warning("Histórico: se omiten %s precios no positivos o inválidos.", int(invalid.sum()))
+    return df[df["fecha"].notna() & ~invalid].copy()
 
 # ── Merge con prioridad ───────────────────────────────────────────────────────
 
