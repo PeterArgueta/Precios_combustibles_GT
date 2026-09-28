@@ -176,20 +176,28 @@ def fetch_api_rows(session: requests.Session) -> pd.DataFrame:
         candidate_rows = table.find_all("tr")
         for row_idx, tr in enumerate(candidate_rows):
             cells = [td.get_text(" ", strip=True) for td in tr.find_all(["td", "th"])]
+            dated_columns: list[tuple[pd.Timestamp, int]] = []
+
             for col_idx, cell in enumerate(cells):
-                if "monitoreo actual" not in _norm_text(cell):
-                    continue
-                parsed_date = _parse_mem_date(cell)
-                if parsed_date is None:
+                norm_cell = _norm_text(cell)
+                if (
+                    "monitoreo actual" not in norm_cell
+                    and "precios monitoreados" not in norm_cell
+                ):
                     continue
 
+                parsed_date = _parse_mem_date(cell)
+                if parsed_date is not None:
+                    dated_columns.append((parsed_date, col_idx))
+
+            if dated_columns:
+                parsed_date, col_idx = max(dated_columns, key=lambda item: item[0])
                 rows_html = candidate_rows
                 header_row_idx = row_idx
                 fecha_actual = parsed_date
                 actual_col_idx = col_idx
                 break
-            if fecha_actual is not None:
-                break
+
         if fecha_actual is not None:
             break
 
@@ -209,7 +217,7 @@ def fetch_api_rows(session: requests.Session) -> pd.DataFrame:
                 if text:
                     samples.append(text[:240])
         LOGGER.warning(
-            "API MEM: no se detectó columna 'Monitoreo Actual' con fecha. "
+            "API MEM: no se detectó una columna de precios monitoreados con fecha. "
             "Muestras de encabezados: %s",
             samples[:6],
         )
