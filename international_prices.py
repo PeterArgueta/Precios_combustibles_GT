@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
 
 import pandas as pd
@@ -10,16 +9,11 @@ from bs4 import BeautifulSoup
 
 LOGGER = logging.getLogger(__name__)
 OUTPUT_CSV = "precios_internacionales.csv"
-START_DATE = pd.Timestamp("2026-01-01")
+START_YEAR = 2026
 
 SERIES = {
-    "Gasolina USGC": "https://www.eia.gov/dnav/pet/hist/eer_epmru_pf4_rgc_dpgW.htm",
-    "Diésel USGC": "https://www.eia.gov/dnav/pet/hist/EER_EPD2DXL0_PF4_RGC_DPGW.htm",
-}
-
-MONTHS = {
-    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
-    "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
+    "Gasolina USGC": "https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?f=M&n=PET&s=EER_EPMRU_PF4_RGC_DPG",
+    "Diésel USGC": "https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?f=M&n=PET&s=EER_EPD2DXL0_PF4_RGC_DPG",
 }
 
 
@@ -34,70 +28,54 @@ def _session() -> requests.Session:
     return session
 
 
-def _parse_weekly_page(html: str, benchmark: str) -> pd.DataFrame:
+def _parse_monthly_page(html: str, benchmark: str) -> pd.DataFrame:
+    """Parsea la tabla mensual EIA: Year | Jan | ... | Dec."""
     soup = BeautifulSoup(html, "html.parser")
     records: list[dict] = []
 
     for tr in soup.find_all("tr"):
         cells = [td.get_text(" ", strip=True) for td in tr.find_all(["td", "th"])]
-        if not cells:
+        if len(cells) < 2:
             continue
 
-        head = re.fullmatch(r"(\d{4})-([A-Z][a-z]{2})", cells[0].strip())
-        if not head:
+        year_text = cells[0].replace("\xa0", " ").strip()
+        if not year_text.isdigit():
             continue
 
-        row_year = int(head.group(1))
-        row_month = MONTHS.get(head.group(2))
-        if row_month is None:
+        year = int(year_text)
+        if year < START_YEAR:
             continue
 
-        i = 1
-        while i + 1 < len(cells):
-            date_text = cells[i].strip()
-            value_text = cells[i + 1].strip().replace(",", "")
-            dm = re.fullmatch(r"(\d{2})/(\d{2})", date_text)
-            if dm:
-                try:
-                    value = float(value_text)
-                except ValueError:
-                    i += 2
-                    continue
+        for month in range(1, min(13, len(cells))):
+            value_text = cells[month].replace(",", "").strip()
+            if value_text in {"", "-", "--", "NA", "W"}:
+                continue
+            try:
+                value = float(value_text)
+            except ValueError:
+                continue
+            if value <= 0:
+                continue
 
-                month, day = map(int, dm.groups())
-                year = row_year
-                if row_month == 1 and month == 12:
-                    year -= 1
-                elif row_month == 12 and month == 1:
-                    year += 1
-
-                try:
-                    date = pd.Timestamp(year=year, month=month, day=day)
-                except ValueError:
-                    i += 2
-                    continue
-
-                if date >= START_DATE and value > 0:
-                    records.append({
-                        "fecha": date,
-                        "benchmark": benchmark,
-                        "precio_usd_gal": value,
-                    })
-            i += 1
+            records.append({
+                "fecha": pd.Timestamp(year=year, month=month, day=1),
+                "benchmark": benchmark,
+                "precio_usd_gal": value,
+            })
 
     if not records:
-        raise RuntimeError(f"EIA: no se extrajeron datos para {benchmark}")
+        raise RuntimeError(f"EIA: no se extrajeron datos mensuales para {benchmark}")
 
     return pd.DataFrame(records).drop_duplicates(["fecha", "benchmark"])
 
 
 def fetch_series(session: requests.Session, benchmark: str, url: str) -> pd.DataFrame:
-    LOGGER.info("Descargando referencia EIA: %s", url)
+    LOGGER.info("Descargando referencia mensual EIA: %s", url)
     response = session.get(url, timeout=60)
     response.raise_for_status()
-    df = _parse_weekly_page(response.text, benchmark)
+    df = _parse_monthly_page(response.text, benchmark)
     LOGGER.info(
-        "EIA %s: %s observaciones, última=%s",
+        "EIA %s: %s observaciones mensuales, última=%s",
         benchmark,
         len(df),
         df["fecha"].max().strftime("%Y-%m-%d"),
@@ -120,9 +98,15 @@ def run(output_csv: str | Path = OUTPUT_CSV) -> pd.DataFrame:
         if output.exists():
             LOGGER.warning("EIA no disponible; se conserva precios_internacionales.csv existente.")
             return pd.read_csv(output, parse_dates=["fecha"])
-        raise RuntimeError("No fue posible obtener referencias internacionales de EIA.")
+
+        LOGGER.warning(
+            "EIA no disponible y no existe caché internacional. "
+            "Se continúa sin serie internacional para no interrumpir la actualización del MEM."
+        )
+        return pd.DataFrame(columns=["fecha", "benchmark", "precio_usd_gal"])
 
     fresh = pd.concat(frames, ignore_index=True)
+
     if output.exists():
         old = pd.read_csv(output)
         old["fecha"] = pd.to_datetime(old["fecha"], errors="coerce")
@@ -136,6 +120,7 @@ def run(output_csv: str | Path = OUTPUT_CSV) -> pd.DataFrame:
         .sort_values(["benchmark", "fecha"])
         .reset_index(drop=True)
     )
+
     out = fresh.copy()
     out["fecha"] = out["fecha"].dt.strftime("%Y-%m-%d")
     out.to_csv(output, index=False)
