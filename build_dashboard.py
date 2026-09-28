@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 from plotly.offline import get_plotlyjs
@@ -133,6 +135,17 @@ h1 {
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
+}
+
+.source-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.source-link:hover {
+  color: var(--accent);
 }
 
 /* ── Layout ── */
@@ -375,8 +388,9 @@ tbody tr:last-child td { border-bottom: none; }
   <div class="topbar">
     <h1>Precios de combustibles en Guatemala</h1>
     <div class="meta">
-      <div><strong>Actualizado:</strong> <span id="lastUpdate">__LAST_UPDATE__</span></div>
-      <div><strong>Fuente:</strong> Ministerio de Energía y Minas de Guatemala — mem.gob.gt</div>
+      <div><strong>Último dato disponible:</strong> <span id="lastUpdate">__LAST_UPDATE__</span></div>
+      <div><strong>Última consulta al MEM:</strong> <span>__LAST_CHECK__</span></div>
+      <div><strong>Fuente:</strong> <a class="source-link" href="https://mem.gob.gt/que-hacemos/hidrocarburos/comercializacion-downstream/precios-combustible-nacionales/" target="_blank" rel="noopener noreferrer">Ministerio de Energía y Minas de Guatemala — mem.gob.gt</a></div>
     </div>
   </div>
 
@@ -827,6 +841,7 @@ render();
         "__MUTED__":           MUTED,
         "__GRID__":            GRID,
         "__LAST_UPDATE__":     payload.get("last_update") or "—",
+        "__LAST_CHECK__":      datetime.now(ZoneInfo("America/Guatemala")).strftime("%d/%m/%Y %H:%M"),
         "__PAYLOAD_JSON__":    payload_json,
         "__FUEL_COLORS_JSON__": fuel_colors_json,
         "__PLOTLY_JS__":       get_plotlyjs(),
