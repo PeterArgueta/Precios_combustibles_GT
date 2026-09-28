@@ -504,7 +504,7 @@ tbody tr:last-child td { border-bottom: none; }
     <h1>Precios de combustibles en Guatemala</h1>
     <div class="meta">
       <div><strong>Último dato disponible:</strong> <span id="lastUpdate">22/09/2026</span></div>
-      <div><strong>Última consulta al MEM:</strong> <span>27/09/2026 20:07</span></div>
+      <div><strong>Última consulta al MEM:</strong> <span>27/09/2026 20:12</span></div>
       <div><strong>Fuente:</strong> <a class="source-link" href="https://mem.gob.gt/que-hacemos/hidrocarburos/comercializacion-downstream/precios-combustible-nacionales/" target="_blank" rel="noopener noreferrer">Ministerio de Energía y Minas de Guatemala — mem.gob.gt</a></div>
     </div>
   </div>
@@ -553,8 +553,8 @@ tbody tr:last-child td { border-bottom: none; }
         <h2 class="section-title">Índice de precios: Guatemala vs. mercado internacional</h2>
         <div class="index-note">
           Enero 2026 = 100. Guatemala usa precios promedio mensuales al consumidor.
-          La referencia internacional pública usa precios spot FOB de U.S. Gulf Coast (EIA).
-          Gasolina Superior y Regular se comparan con el benchmark de gasolina; Diésel con ULSD.
+          La referencia internacional pública usa precios spot FOB de Costa del Golfo de EE. UU. (EIA).
+          Gasolina Superior y Regular se comparan con la referencia internacional de gasolina; Diésel con la referencia ULSD.
           <a class="source-link" href="https://www.eia.gov/dnav/pet/hist/eer_epmru_pf4_rgc_dpgW.htm" target="_blank" rel="noopener noreferrer">EIA gasolina</a>
           ·
           <a class="source-link" href="https://www.eia.gov/dnav/pet/hist/EER_EPD2DXL0_PF4_RGC_DPGW.htm" target="_blank" rel="noopener noreferrer">EIA diésel</a>
@@ -4252,6 +4252,12 @@ function formatDateSpanish(date) {
   return `${String(d.getDate()).padStart(2,"0")} ${MONTHS_ES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+function formatMonthSpanish(yyyyMm) {
+  const [year, month] = String(yyyyMm).split("-").map(Number);
+  if (!year || !month || month < 1 || month > 12) return yyyyMm;
+  return `${MONTHS_ES[month - 1]} ${year}`;
+}
+
 function money(v) {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
   return "Q" + Number(v).toFixed(2);
@@ -4559,7 +4565,7 @@ function renderIndexChart() {
   const traces = selected
     .filter(name => (series[name] || []).length)
     .map(name => ({
-      x: series[name].map(d => d.mes),
+      x: series[name].map(d => formatMonthSpanish(d.mes)),
       y: series[name].map(d => d.indice),
       name: name,
       type: "scatter",
