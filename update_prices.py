@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 import requests
 import build_dashboard
+import international_prices
 import scraper
 
 LOG_FILE = "fuel_prices.log"
@@ -19,7 +20,12 @@ def main() -> int:
     logging.getLogger("").addHandler(console)
     try:
         df, source_url = scraper.run("precios_historicos.csv")
-        build_dashboard.main("precios_historicos.csv", "index.html")
+        international_prices.run("precios_internacionales.csv")
+        build_dashboard.main(
+            "precios_historicos.csv",
+            "index.html",
+            "precios_internacionales.csv",
+        )
         logging.info("Actualización completada. Filas: %s | Fuente: %s", len(df), source_url)
         return 0
     except requests.exceptions.HTTPError as exc:

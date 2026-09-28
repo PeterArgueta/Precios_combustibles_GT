@@ -9,6 +9,7 @@ import pandas as pd
 from plotly.offline import get_plotlyjs
 
 INPUT_CSV  = "precios_historicos.csv"
+INTERNATIONAL_CSV = "precios_internacionales.csv"
 OUTPUT_HTML = "index.html"
 
 ACCENT = "#d62d20"
@@ -70,6 +71,68 @@ def build_payload(df: pd.DataFrame) -> dict:
         ]
 
     return payload
+
+
+
+def build_index_payload(
+    df: pd.DataFrame,
+    international_csv: str | Path = INTERNATIONAL_CSV,
+) -> dict:
+    """Índices mensuales con enero 2026 = 100."""
+    result = {"series": {}, "base": "2026-01", "international_last_update": None}
+    start = pd.Timestamp("2026-01-01")
+
+    local = df[df["fecha"] >= start].copy()
+    if not local.empty:
+        local["mes"] = local["fecha"].dt.to_period("M").astype(str)
+        monthly = (
+            local.groupby(["mes", "combustible"], as_index=False)["precio"]
+            .mean()
+            .sort_values("mes")
+        )
+        for fuel in ORDER:
+            sub = monthly[monthly["combustible"] == fuel].copy()
+            base_rows = sub[sub["mes"] == "2026-01"]
+            if sub.empty or base_rows.empty:
+                continue
+            base = float(base_rows.iloc[0]["precio"])
+            result["series"][f"GT {fuel}"] = [
+                {"mes": row.mes, "indice": round(float(row.precio) / base * 100, 2)}
+                for row in sub.itertuples()
+            ]
+
+    path = Path(international_csv)
+    if path.exists():
+        intl = pd.read_csv(path)
+        intl["fecha"] = pd.to_datetime(intl["fecha"], errors="coerce")
+        intl["precio_usd_gal"] = pd.to_numeric(intl["precio_usd_gal"], errors="coerce")
+        intl = intl[
+            intl["fecha"].notna()
+            & intl["precio_usd_gal"].notna()
+            & (intl["precio_usd_gal"] > 0)
+            & (intl["fecha"] >= start)
+        ].copy()
+
+        if not intl.empty:
+            result["international_last_update"] = intl["fecha"].max().strftime("%d/%m/%Y")
+            intl["mes"] = intl["fecha"].dt.to_period("M").astype(str)
+            monthly_intl = (
+                intl.groupby(["mes", "benchmark"], as_index=False)["precio_usd_gal"]
+                .mean()
+                .sort_values("mes")
+            )
+            for benchmark in ["Gasolina USGC", "Diésel USGC"]:
+                sub = monthly_intl[monthly_intl["benchmark"] == benchmark].copy()
+                base_rows = sub[sub["mes"] == "2026-01"]
+                if sub.empty or base_rows.empty:
+                    continue
+                base = float(base_rows.iloc[0]["precio_usd_gal"])
+                result["series"][benchmark] = [
+                    {"mes": row.mes, "indice": round(float(row.precio_usd_gal) / base * 100, 2)}
+                    for row in sub.itertuples()
+                ]
+
+    return result
 
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
@@ -273,6 +336,36 @@ h1 {
 .kpi-multi-row:last-child { border-bottom: none; }
 .kpi-multi-label { font-size: 13px; color: var(--muted); }
 .kpi-multi-val   { font-weight: 600; }
+
+/* ── International index ── */
+.index-section {
+  margin-top: 20px;
+  padding: 14px;
+  background: rgba(255,255,255,.55);
+  border: 1px solid var(--border);
+}
+
+.index-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 10px;
+}
+
+.index-copy { max-width: 780px; }
+
+.index-note {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+#indexChart {
+  width: 100%;
+  height: 430px;
+}
 
 /* ── Summary table ── */
 .summary-section { margin-top: 20px; }
@@ -481,8 +574,31 @@ tbody tr:last-child td { border-bottom: none; }
   }
 
   .summary-section,
-  .context-section {
+  .context-section,
+  .index-section {
     margin-top: 16px;
+  }
+
+  .index-section {
+    padding: 10px 8px 6px;
+    border-radius: 8px;
+  }
+
+  .index-head {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 8px;
+  }
+
+  #indexFuelTabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  #indexChart {
+    height: 350px;
   }
 
   .section-head {
@@ -575,6 +691,25 @@ tbody tr:last-child td { border-bottom: none; }
 
   </div><!-- /.layout -->
 
+  <!-- ── Índice internacional vs Guatemala ── -->
+  <section class="index-section">
+    <div class="index-head">
+      <div class="index-copy">
+        <h2 class="section-title">Índice de precios: Guatemala vs. mercado internacional</h2>
+        <div class="index-note">
+          Enero 2026 = 100. Guatemala usa precios promedio mensuales al consumidor.
+          La referencia internacional pública usa precios spot FOB de U.S. Gulf Coast (EIA).
+          Gasolina Superior y Regular se comparan con el benchmark de gasolina; Diésel con ULSD.
+          <a class="source-link" href="https://www.eia.gov/dnav/pet/hist/eer_epmru_pf4_rgc_dpgW.htm" target="_blank" rel="noopener noreferrer">EIA gasolina</a>
+          ·
+          <a class="source-link" href="https://www.eia.gov/dnav/pet/hist/EER_EPD2DXL0_PF4_RGC_DPGW.htm" target="_blank" rel="noopener noreferrer">EIA diésel</a>
+        </div>
+      </div>
+      <div class="tab-row" id="indexFuelTabs"></div>
+    </div>
+    <div id="indexChart"></div>
+  </section>
+
   <!-- ── Summary table ── -->
   <div class="summary-section">
     <div class="section-head">
@@ -611,6 +746,8 @@ tbody tr:last-child td { border-bottom: none; }
 const PAYLOAD     = __PAYLOAD_JSON__;
 const FUEL_COLORS = __FUEL_COLORS_JSON__;
 const ORDER       = ["Superior", "Regular", "Diésel"];
+const INDEX_DATA  = PAYLOAD.index_comparison || { series: {} };
+let currentIndexFuel = "Superior";
 
 const CARD_CLASS  = {
   "Superior": "card-super",
@@ -903,6 +1040,101 @@ function renderContextPanel() {
     cards || '<p style="color:var(--muted);font-size:14px">Sin datos suficientes para el período.</p>';
 }
 
+// ── Índice internacional vs Guatemala ────────────────────────────────────────
+
+function buildIndexFuelTabs() {
+  const el = document.getElementById("indexFuelTabs");
+  if (!el) return;
+  el.innerHTML = "";
+
+  ["Superior", "Regular", "Diésel", "Combinado"].forEach(fuel => {
+    const btn = document.createElement("button");
+    btn.className = "tab-btn" + (currentIndexFuel === fuel ? " active-combinado" : "");
+    btn.textContent = fuel;
+    btn.onclick = () => {
+      currentIndexFuel = fuel;
+      buildIndexFuelTabs();
+      renderIndexChart();
+    };
+    el.appendChild(btn);
+  });
+}
+
+function renderIndexChart() {
+  const el = document.getElementById("indexChart");
+  if (!el) return;
+
+  const series = INDEX_DATA.series || {};
+  let selected;
+  if (currentIndexFuel === "Combinado") {
+    selected = ["GT Superior", "GT Regular", "GT Diésel", "Gasolina USGC", "Diésel USGC"];
+  } else if (currentIndexFuel === "Diésel") {
+    selected = ["GT Diésel", "Diésel USGC"];
+  } else {
+    selected = ["GT " + currentIndexFuel, "Gasolina USGC"];
+  }
+
+  const indexColors = {
+    "GT Superior": FUEL_COLORS["Superior"],
+    "GT Regular": FUEL_COLORS["Regular"],
+    "GT Diésel": FUEL_COLORS["Diésel"],
+    "Gasolina USGC": "#6a6a6a",
+    "Diésel USGC": "#1f1f1f"
+  };
+
+  const traces = selected
+    .filter(name => (series[name] || []).length)
+    .map(name => ({
+      x: series[name].map(d => d.mes),
+      y: series[name].map(d => d.indice),
+      name: name,
+      type: "scatter",
+      mode: "lines+markers",
+      hovertemplate: "<b>" + name + "</b><br>%{x}<br>Índice %{y:.1f}<extra></extra>",
+      line: {
+        color: indexColors[name],
+        width: name.includes("USGC") ? 2.5 : 3,
+        dash: name.includes("USGC") ? "dash" : "solid"
+      },
+      marker: { size: 5 }
+    }));
+
+  const isMobile = window.innerWidth <= 640;
+  Plotly.newPlot("indexChart", traces, {
+    paper_bgcolor: "__BG__",
+    plot_bgcolor: "__BG__",
+    margin: isMobile ? { t: 18, r: 8, b: 55, l: 46 } : { t: 20, r: 20, b: 50, l: 60 },
+    showlegend: true,
+    legend: {
+      orientation: "h",
+      y: isMobile ? -0.20 : -0.15,
+      x: 0.5,
+      xanchor: "center",
+      font: { size: isMobile ? 10 : 12 }
+    },
+    xaxis: {
+      showgrid: false,
+      tickfont: { size: isMobile ? 10 : 12, color: "__MUTED__" }
+    },
+    yaxis: {
+      title: isMobile ? "" : "Índice (ene 2026 = 100)",
+      showgrid: true,
+      gridcolor: "__GRID__",
+      zeroline: false,
+      tickfont: { size: 11, color: "__MUTED__" }
+    },
+    shapes: [{
+      type: "line",
+      xref: "paper",
+      x0: 0, x1: 1,
+      y0: 100, y1: 100,
+      line: { color: "#9a9a9a", width: 1, dash: "dot" }
+    }],
+    font: { family: "Inter, Arial, sans-serif", color: "__TEXT__" },
+    hoverlabel: { bgcolor: "#ffffff", bordercolor: "__GRID__", font: { color: "__TEXT__" } }
+  }, { responsive: true, displayModeBar: false });
+}
+
 // ── Summary table ─────────────────────────────────────────────────────────────
 
 function renderSummaryTable() {
@@ -990,6 +1222,8 @@ function render() {
 
 buildFuelTabs();
 buildRangeTabs();
+buildIndexFuelTabs();
+renderIndexChart();
 renderSummaryTable();
 render();
 </script>
@@ -1020,9 +1254,11 @@ render();
 def main(
     input_csv:   str | Path = INPUT_CSV,
     output_html: str | Path = OUTPUT_HTML,
+    international_csv: str | Path = INTERNATIONAL_CSV,
 ) -> Path:
     df      = prepare_data(input_csv)
     payload = build_payload(df)
+    payload["index_comparison"] = build_index_payload(df, international_csv)
     html    = build_html(payload)
 
     output_path = Path(output_html)
