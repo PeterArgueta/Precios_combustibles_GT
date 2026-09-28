@@ -292,10 +292,154 @@ tbody tr:last-child td { border-bottom: none; }
 }
 
 @media (max-width: 640px) {
-  .wrapper { padding: 14px 12px 28px; }
-  h1 { font-size: 28px; }
-  .tab-btn, .range-btn { padding: 9px 11px; font-size: 13px; }
-  #chart { height: 390px; }
+  body { overflow-x: hidden; }
+
+  .wrapper {
+    width: 100%;
+    padding: 10px 10px 24px;
+  }
+
+  .topbar {
+    border-top-width: 4px;
+    padding: 12px 4px 0;
+    margin-bottom: 14px;
+  }
+
+  h1 {
+    font-size: clamp(27px, 8vw, 34px);
+    line-height: 1.02;
+    margin-bottom: 12px;
+  }
+
+  .meta {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 7px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .meta > div {
+    min-width: 0;
+  }
+
+  .source-link {
+    overflow-wrap: anywhere;
+  }
+
+  .layout { gap: 14px; }
+
+  .panel {
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .main-panel {
+    padding: 10px 8px 6px;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .tab-row,
+  .range-row {
+    display: grid;
+    width: 100%;
+    gap: 6px;
+  }
+
+  .tab-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .range-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .tab-btn,
+  .range-btn {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 10px 6px;
+    font-size: 13px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  .chart-title {
+    font-size: 20px;
+    line-height: 1.15;
+    margin: 8px 4px 2px;
+  }
+
+  .chart-subtitle {
+    margin: 0 4px 4px;
+  }
+
+  #chart {
+    height: 360px;
+    min-height: 360px;
+  }
+
+  .sidebar {
+    border-radius: 8px;
+  }
+
+  .kpi {
+    padding: 12px 14px;
+  }
+
+  .kpi-value {
+    font-size: 27px;
+  }
+
+  .summary-section,
+  .context-section {
+    margin-top: 16px;
+  }
+
+  .section-head {
+    align-items: flex-start;
+  }
+
+  .section-title {
+    font-size: 20px;
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+  }
+
+  thead th,
+  tbody td {
+    padding: 10px 9px;
+    font-size: 12px;
+  }
+
+  .context-cards {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .context-card {
+    padding: 12px 14px;
+    border-radius: 7px;
+  }
+}
+
+@media (max-width: 380px) {
+  .wrapper { padding-left: 8px; padding-right: 8px; }
+  .tab-btn, .range-btn { font-size: 12px; padding: 9px 4px; }
+  #chart { height: 340px; min-height: 340px; }
 }
 </style>
 </head>
@@ -307,7 +451,7 @@ tbody tr:last-child td { border-bottom: none; }
     <h1>Precios de combustibles en Guatemala</h1>
     <div class="meta">
       <div><strong>Último dato disponible:</strong> <span id="lastUpdate">22/09/2026</span></div>
-      <div><strong>Última consulta al MEM:</strong> <span>27/09/2026 19:35</span></div>
+      <div><strong>Última consulta al MEM:</strong> <span>27/09/2026 19:38</span></div>
       <div><strong>Fuente:</strong> <a class="source-link" href="https://mem.gob.gt/que-hacemos/hidrocarburos/comercializacion-downstream/precios-combustible-nacionales/" target="_blank" rel="noopener noreferrer">Ministerio de Energía y Minas de Guatemala — mem.gob.gt</a></div>
     </div>
   </div>
@@ -4132,13 +4276,16 @@ function renderChart() {
   const refSeries = filterSeries(parseSeries(fuels[0]));
   const ticks     = buildSpanishTicks(refSeries);
 
+  const isMobile = window.innerWidth <= 640;
   const layout = {
     paper_bgcolor: "#f8f6f0",
     plot_bgcolor:  "#f8f6f0",
-    margin:        { t: 10, r: 20, b: 45, l: 60 },
+    margin:        isMobile
+      ? { t: 8, r: 8, b: 54, l: 46 }
+      : { t: 10, r: 20, b: 45, l: 60 },
     showlegend:    isCombinado,
-    legend:        { orientation: "h", y: -0.12, x: 0.5, xanchor: "center",
-                     font: { size: 13 } },
+    legend:        { orientation: "h", y: isMobile ? -0.16 : -0.12, x: 0.5, xanchor: "center",
+                     font: { size: isMobile ? 11 : 13 } },
     xaxis: {
       showgrid:  true,
       gridcolor: "#d9d5cc",
