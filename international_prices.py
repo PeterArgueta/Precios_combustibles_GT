@@ -1,19 +1,19 @@
 from __future__ import annotations
 
+import io
 import logging
 from pathlib import Path
 
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
 
 LOGGER = logging.getLogger(__name__)
 OUTPUT_CSV = "precios_internacionales.csv"
-START_YEAR = 2026
+START_DATE = pd.Timestamp("2026-01-01")
 
 SERIES = {
-    "Gasolina USGC": "https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?f=M&n=PET&s=EER_EPMRU_PF4_RGC_DPG",
-    "Diésel USGC": "https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?f=M&n=PET&s=EER_EPD2DXL0_PF4_RGC_DPG",
+    "Gasolina USGC": "https://www.eia.gov/dnav/pet/hist_xls/EER_EPMRU_PF4_RGC_DPGw.xls",
+    "Diésel USGC": "https://www.eia.gov/dnav/pet/hist_xls/EER_EPD2DXL0_PF4_RGC_DPGw.xls",
 }
 
 
@@ -28,54 +28,77 @@ def _session() -> requests.Session:
     return session
 
 
-def _parse_monthly_page(html: str, benchmark: str) -> pd.DataFrame:
-    """Parsea la tabla mensual EIA: Year | Jan | ... | Dec."""
-    soup = BeautifulSoup(html, "html.parser")
-    records: list[dict] = []
+def _extract_from_xls(content: bytes, benchmark: str) -> pd.DataFrame:
+    """Extrae fecha y precio de los XLS históricos oficiales de EIA."""
+    workbook = pd.read_excel(
+        io.BytesIO(content),
+        sheet_name=None,
+        header=None,
+        engine="xlrd",
+    )
 
-    for tr in soup.find_all("tr"):
-        cells = [td.get_text(" ", strip=True) for td in tr.find_all(["td", "th"])]
-        if len(cells) < 2:
+    candidates: list[pd.DataFrame] = []
+
+    for sheet_name, raw in workbook.items():
+        if raw.empty or raw.shape[1] < 2:
             continue
 
-        year_text = cells[0].replace("\xa0", " ").strip()
-        if not year_text.isdigit():
-            continue
-
-        year = int(year_text)
-        if year < START_YEAR:
-            continue
-
-        for month in range(1, min(13, len(cells))):
-            value_text = cells[month].replace(",", "").strip()
-            if value_text in {"", "-", "--", "NA", "W"}:
-                continue
-            try:
-                value = float(value_text)
-            except ValueError:
-                continue
-            if value <= 0:
+        # En los libros históricos de EIA la primera columna útil es la fecha.
+        # Buscamos de forma tolerante por si cambian encabezados o filas introductorias.
+        for date_col in range(min(3, raw.shape[1])):
+            dates = pd.to_datetime(raw.iloc[:, date_col], errors="coerce")
+            date_mask = dates.notna() & (dates >= START_DATE)
+            if not date_mask.any():
                 continue
 
-            records.append({
-                "fecha": pd.Timestamp(year=year, month=month, day=1),
-                "benchmark": benchmark,
-                "precio_usd_gal": value,
-            })
+            for value_col in range(date_col + 1, raw.shape[1]):
+                values = pd.to_numeric(raw.iloc[:, value_col], errors="coerce")
+                mask = date_mask & values.notna() & (values > 0)
+                if mask.sum() < 2:
+                    continue
 
-    if not records:
-        raise RuntimeError(f"EIA: no se extrajeron datos mensuales para {benchmark}")
+                candidate = pd.DataFrame({
+                    "fecha": dates[mask].dt.normalize(),
+                    "benchmark": benchmark,
+                    "precio_usd_gal": values[mask].astype(float),
+                })
+                candidates.append(candidate)
 
-    return pd.DataFrame(records).drop_duplicates(["fecha", "benchmark"])
+    if not candidates:
+        raise RuntimeError(f"EIA XLS: no se extrajeron datos para {benchmark}")
+
+    # Elegimos el bloque con más observaciones válidas; evita tomar hojas auxiliares.
+    best = max(candidates, key=len)
+    best = (
+        best.drop_duplicates(["fecha", "benchmark"], keep="last")
+        .sort_values("fecha")
+        .reset_index(drop=True)
+    )
+
+    if best.empty:
+        raise RuntimeError(f"EIA XLS: serie vacía para {benchmark}")
+
+    return best
 
 
-def fetch_series(session: requests.Session, benchmark: str, url: str) -> pd.DataFrame:
-    LOGGER.info("Descargando referencia mensual EIA: %s", url)
+def fetch_series(
+    session: requests.Session,
+    benchmark: str,
+    url: str,
+) -> pd.DataFrame:
+    LOGGER.info("Descargando referencia EIA XLS: %s", url)
     response = session.get(url, timeout=60)
     response.raise_for_status()
-    df = _parse_monthly_page(response.text, benchmark)
+
+    content_type = response.headers.get("content-type", "").lower()
+    if "excel" not in content_type and len(response.content) < 1024:
+        raise RuntimeError(
+            f"EIA devolvió contenido inesperado ({content_type}, {len(response.content)} bytes)"
+        )
+
+    df = _extract_from_xls(response.content, benchmark)
     LOGGER.info(
-        "EIA %s: %s observaciones mensuales, última=%s",
+        "EIA %s: %s observaciones, última=%s",
         benchmark,
         len(df),
         df["fecha"].max().strftime("%Y-%m-%d"),
@@ -96,22 +119,25 @@ def run(output_csv: str | Path = OUTPUT_CSV) -> pd.DataFrame:
 
     if not frames:
         if output.exists():
-            LOGGER.warning("EIA no disponible; se conserva precios_internacionales.csv existente.")
+            LOGGER.warning(
+                "EIA no disponible; se conserva precios_internacionales.csv existente."
+            )
             return pd.read_csv(output, parse_dates=["fecha"])
-
-        LOGGER.warning(
-            "EIA no disponible y no existe caché internacional. "
-            "Se continúa sin serie internacional para no interrumpir la actualización del MEM."
-        )
-        return pd.DataFrame(columns=["fecha", "benchmark", "precio_usd_gal"])
+        raise RuntimeError("No fue posible obtener referencias internacionales de EIA.")
 
     fresh = pd.concat(frames, ignore_index=True)
 
     if output.exists():
         old = pd.read_csv(output)
         old["fecha"] = pd.to_datetime(old["fecha"], errors="coerce")
-        old["precio_usd_gal"] = pd.to_numeric(old["precio_usd_gal"], errors="coerce")
-        old = old[old["fecha"].notna() & old["precio_usd_gal"].notna()]
+        old["precio_usd_gal"] = pd.to_numeric(
+            old["precio_usd_gal"], errors="coerce"
+        )
+        old = old[
+            old["fecha"].notna()
+            & old["precio_usd_gal"].notna()
+            & (old["precio_usd_gal"] > 0)
+        ]
         fresh = pd.concat([old, fresh], ignore_index=True)
 
     fresh["fecha"] = pd.to_datetime(fresh["fecha"]).dt.normalize()
@@ -124,10 +150,19 @@ def run(output_csv: str | Path = OUTPUT_CSV) -> pd.DataFrame:
     out = fresh.copy()
     out["fecha"] = out["fecha"].dt.strftime("%Y-%m-%d")
     out.to_csv(output, index=False)
+
+    LOGGER.info(
+        "Referencias internacionales actualizadas: %s filas (%s benchmarks)",
+        len(out),
+        out["benchmark"].nunique(),
+    )
     return fresh
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(message)s",
+    )
     dataframe = run()
     print(f"OK | {len(dataframe)} observaciones internacionales")
