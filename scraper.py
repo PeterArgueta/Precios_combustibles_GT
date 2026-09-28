@@ -161,39 +161,64 @@ def fetch_api_rows(session: requests.Session) -> pd.DataFrame:
             except ValueError:
                 pass
 
-    # ── Primera tabla = modalidad autoservicio ────────────────────────────────
+    # ── Buscar la tabla de autoservicio sin asumir posición fija ──────────────
     tables = soup.find_all("table")
     if not tables:
         LOGGER.warning("API MEM: no se encontraron tablas en content.rendered.")
         return pd.DataFrame(columns=["fecha", "combustible", "precio", "tipo_cambio"])
 
-    table     = tables[0]
-    rows_html = table.find_all("tr")
-    if not rows_html:
-        return pd.DataFrame(columns=["fecha", "combustible", "precio", "tipo_cambio"])
-
-    # ── Detectar columna "Monitoreo Actual" y su fecha ───────────────────────
-    header_cells   = [td.get_text(strip=True) for td in rows_html[0].find_all(["td", "th"])]
+    rows_html = []
+    header_row_idx: int | None = None
     fecha_actual: pd.Timestamp | None = None
-    actual_col_idx: int | None        = None
+    actual_col_idx: int | None = None
 
-    for i, cell in enumerate(header_cells):
-        if "monitoreo actual" not in _norm_text(cell):
-            continue
-        parsed_date = _parse_mem_date(cell)
-        if parsed_date is not None:
-            fecha_actual   = parsed_date
-            actual_col_idx = i
+    for table in tables:
+        candidate_rows = table.find_all("tr")
+        for row_idx, tr in enumerate(candidate_rows):
+            cells = [td.get_text(" ", strip=True) for td in tr.find_all(["td", "th"])]
+            for col_idx, cell in enumerate(cells):
+                if "monitoreo actual" not in _norm_text(cell):
+                    continue
+                parsed_date = _parse_mem_date(cell)
+                if parsed_date is None:
+                    continue
+
+                rows_html = candidate_rows
+                header_row_idx = row_idx
+                fecha_actual = parsed_date
+                actual_col_idx = col_idx
+                break
+            if fecha_actual is not None:
+                break
+        if fecha_actual is not None:
             break
 
-    if fecha_actual is None or actual_col_idx is None:
-        LOGGER.warning("API MEM: no se detectó columna 'Monitoreo Actual' con fecha.")
+    if (
+        fecha_actual is None
+        or actual_col_idx is None
+        or header_row_idx is None
+        or not rows_html
+    ):
+        samples = []
+        for table in tables[:3]:
+            for tr in table.find_all("tr")[:3]:
+                text = " | ".join(
+                    td.get_text(" ", strip=True)
+                    for td in tr.find_all(["td", "th"])
+                )
+                if text:
+                    samples.append(text[:240])
+        LOGGER.warning(
+            "API MEM: no se detectó columna 'Monitoreo Actual' con fecha. "
+            "Muestras de encabezados: %s",
+            samples[:6],
+        )
         return pd.DataFrame(columns=["fecha", "combustible", "precio", "tipo_cambio"])
 
     # ── Extraer filas de datos ────────────────────────────────────────────────
     records: list[dict] = []
-    for tr in rows_html[1:]:
-        cells = [td.get_text(strip=True) for td in tr.find_all(["td", "th"])]
+    for tr in rows_html[header_row_idx + 1:]:
+        cells = [td.get_text(" ", strip=True) for td in tr.find_all(["td", "th"])]
         if len(cells) <= actual_col_idx:
             continue
         fuel = API_FUEL_MAP.get(_norm_text(cells[0]))
