@@ -61,6 +61,52 @@ def _norm_text(value: object) -> str:
     text = re.sub(r"\s+", " ", text)
     return text
 
+SPANISH_MONTHS = {
+    "enero": 1,
+    "febrero": 2,
+    "marzo": 3,
+    "abril": 4,
+    "mayo": 5,
+    "junio": 6,
+    "julio": 7,
+    "agosto": 8,
+    "septiembre": 9,
+    "setiembre": 9,
+    "octubre": 10,
+    "noviembre": 11,
+    "diciembre": 12,
+}
+
+
+def _parse_mem_date(value: object) -> pd.Timestamp | None:
+    """Convierte fechas del MEM en formato numérico o escrito en español."""
+    text = _norm_text(value)
+
+    numeric = re.search(r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b", text)
+    if numeric:
+        day, month, year = map(int, numeric.groups())
+        try:
+            return pd.Timestamp(year=year, month=month, day=day)
+        except ValueError:
+            return None
+
+    written = re.search(
+        r"\b(\d{1,2})\s+de\s+([a-z]+)\s+de\s+(\d{4})\b",
+        text,
+    )
+    if written:
+        day = int(written.group(1))
+        month = SPANISH_MONTHS.get(written.group(2))
+        year = int(written.group(3))
+        if month is None:
+            return None
+        try:
+            return pd.Timestamp(year=year, month=month, day=day)
+        except ValueError:
+            return None
+
+    return None
+
 # ── Proxy helper ──────────────────────────────────────────────────────────────
 
 def _get_mem(url: str, session: requests.Session, **kwargs) -> requests.Response:
@@ -132,14 +178,13 @@ def fetch_api_rows(session: requests.Session) -> pd.DataFrame:
     actual_col_idx: int | None        = None
 
     for i, cell in enumerate(header_cells):
-        m = re.search(r"Monitoreo Actual[^:]*:\s*(\d{2}/\d{2}/\d{4})", cell, re.IGNORECASE)
-        if m:
-            try:
-                fecha_actual   = pd.to_datetime(m.group(1), format="%d/%m/%Y")
-                actual_col_idx = i
-                break
-            except ValueError:
-                pass
+        if "monitoreo actual" not in _norm_text(cell):
+            continue
+        parsed_date = _parse_mem_date(cell)
+        if parsed_date is not None:
+            fecha_actual   = parsed_date
+            actual_col_idx = i
+            break
 
     if fecha_actual is None or actual_col_idx is None:
         LOGGER.warning("API MEM: no se detectó columna 'Monitoreo Actual' con fecha.")

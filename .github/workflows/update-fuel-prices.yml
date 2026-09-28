@@ -3,6 +3,16 @@ on:
   schedule:
     - cron: "0 14 */1 * *"
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "scraper.py"
+      - "update_prices.py"
+      - "build_dashboard.py"
+      - "requirements.txt"
+      - ".github/workflows/update-fuel-prices.yml"
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -15,6 +25,16 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Validate Python and MEM date parser
+        run: |
+          python -m py_compile scraper.py build_dashboard.py update_prices.py
+          python - <<'PY'
+          from scraper import _parse_mem_date
+
+          assert _parse_mem_date("Monitoreo Actual: 25/09/2026").strftime("%Y-%m-%d") == "2026-09-25"
+          assert _parse_mem_date("Monitoreo Actual: 25 de septiembre de 2026").strftime("%Y-%m-%d") == "2026-09-25"
+          print("Parser de fechas MEM: OK")
+          PY
       - name: Update data and dashboard
         env:
           CLOUDFLARE_PROXY_URL: ${{ secrets.CLOUDFLARE_PROXY_URL }}
