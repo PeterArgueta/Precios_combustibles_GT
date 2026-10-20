@@ -1,6 +1,13 @@
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
 
-
-
-
-
-
+# Local logs and temporary output
+*.log
+*.tmp
+.DS_Store
