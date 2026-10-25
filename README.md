@@ -48,7 +48,7 @@ Para regenerar únicamente la interfaz con datos ya disponibles:
 python build_dashboard.py
 ```
 
-Revisa los archivos CSV resultantes y abre `index.html` en un navegador para comprobar la visualización. El repositorio contiene flujos de GitHub Actions en `.github/` para tareas automatizadas; verifica sus condiciones antes de modificar los archivos publicados.
+Revisa los archivos CSV resultantes y abre `index.html` en un navegador para comprobar la visualización. El repositorio contiene flujos de GitHub Actions en `.github/` para tareas automatizadas.
 
 ## Criterios de interpretación
 
@@ -59,10 +59,9 @@ Revisa los archivos CSV resultantes y abre `index.html` en un navegador para com
 
 ## Calidad y mantenimiento
 
-El procesamiento incluye scripts independientes para extracción, actualización y construcción del tablero. El seguimiento de errores se realiza mediante un archivo de registro local. No se declara cobertura de pruebas automatizadas que no haya sido verificada.
+El procesamiento incluye scripts independientes para extracción, actualización y construcción del tablero. El seguimiento de errores se realiza mediante un archivo de registro local. 
 
-Los CSV históricos se conservan deliberadamente como parte de los datos del proyecto. Los registros temporales, cachés y entornos virtuales **no** deberían incorporarse al control de versiones. Para contribuciones, evita publicar credenciales y archivos de configuración local.
-
+Los CSV históricos se conservan deliberadamente como parte de los datos del proyecto. Los registros temporales, cachés y entornos virtuales **no** deberían incorporarse al control de versiones. 
 ## Fuente y atribución
 
 Fuente principal: [Ministerio de Energía y Minas de Guatemala (MEM)](https://mem.gob.gt/). Este es un proyecto independiente de procesamiento y visualización; no constituye una publicación oficial del MEM.
