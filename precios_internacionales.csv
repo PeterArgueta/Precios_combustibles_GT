@@ -41,6 +41,7 @@ fecha,benchmark,precio_usd_gal
 2026-10-02,Diésel USGC,4.731
 2026-10-09,Diésel USGC,4.64
 2026-10-16,Diésel USGC,4.836
+2026-10-23,Diésel USGC,4.948
 2026-01-02,Gasolina USGC,1.809
 2026-01-09,Gasolina USGC,1.966
 2026-01-16,Gasolina USGC,2.042
@@ -83,3 +84,4 @@ fecha,benchmark,precio_usd_gal
 2026-10-02,Gasolina USGC,3.672
 2026-10-09,Gasolina USGC,3.513
 2026-10-16,Gasolina USGC,3.394
+2026-10-23,Gasolina USGC,3.183
