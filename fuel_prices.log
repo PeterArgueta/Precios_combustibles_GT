@@ -3009,3 +3009,22 @@ requests.exceptions.ConnectionError: HTTPSConnectionPool(host='mem.gob.gt', port
 2026-11-04 20:37:20,291 | INFO | EIA Diésel USGC: 44 observaciones, última=2026-10-30
 2026-11-04 20:37:20,296 | INFO | Referencias internacionales actualizadas: 88 filas (2 benchmarks)
 2026-11-04 20:37:20,407 | INFO | Actualización completada. Filas: 20075 | Fuente: https://mem.gob.gt/wp-content/uploads/2026/10/Precios-Promedio-Nacionales-Diarios-2026-3.xlsx
+2026-11-05 20:53:38,653 | INFO | Request vía proxy Cloudflare: https://calm-dust-1c09.ssapanalistadedatos2024.workers.dev?url=https://mem.gob.gt/
+2026-11-05 20:53:39,371 | INFO | _get_mem | status=200 | bytes=140287
+2026-11-05 20:53:40,381 | INFO | Histórico existente: 20075 filas
+2026-11-05 20:53:40,381 | INFO | Request vía proxy Cloudflare: https://calm-dust-1c09.ssapanalistadedatos2024.workers.dev?url=https://mem.gob.gt/wp-json/wp/v2/pages/45428
+2026-11-05 20:53:40,703 | INFO | _get_mem | status=200 | bytes=27191
+2026-11-05 20:53:40,703 | INFO | API raw | status=200 | bytes=27191 | preview='{"id":45428,"date":"2020-11-19T13:29:42","date_gmt":"2020-11-19T13:29:42","guid":{"rendered":"https:\\/\\/mem.gob.gt\\/?page_id=45428"},"modified":"2026-11-05T20:14:05","modified_gmt":"2026-11-05T20:14:0'
+2026-11-05 20:53:40,708 | INFO | API MEM: 3 filas extraídas para fecha 2026-11-03 (tipo_cambio=Q7.663)
+2026-11-05 20:53:40,709 | INFO | Request vía proxy Cloudflare: https://calm-dust-1c09.ssapanalistadedatos2024.workers.dev?url=https://mem.gob.gt/wp-json/wp/v2/pages/45428
+2026-11-05 20:53:40,807 | INFO | _get_mem | status=200 | bytes=27191
+2026-11-05 20:53:40,811 | INFO | URL del Excel obtenida vía API: https://mem.gob.gt/wp-content/uploads/2026/10/Precios-Promedio-Nacionales-Diarios-2026-3.xlsx
+2026-11-05 20:53:40,811 | INFO | Descargando Excel vía proxy Cloudflare: https://calm-dust-1c09.ssapanalistadedatos2024.workers.dev?url=https://mem.gob.gt/wp-content/uploads/2026/10/Precios-Promedio-Nacionales-Diarios-2026-3.xlsx
+2026-11-05 20:53:41,323 | INFO | Excel MEM: 20072 filas extraídas
+2026-11-05 20:53:41,365 | INFO | CSV actualizado: 20075 filas totales (0 nuevas) | fuente Excel: https://mem.gob.gt/wp-content/uploads/2026/10/Precios-Promedio-Nacionales-Diarios-2026-3.xlsx
+2026-11-05 20:53:41,366 | INFO | Descargando referencia EIA XLS: https://www.eia.gov/dnav/pet/hist_xls/EER_EPMRU_PF4_RGC_DPGw.xls
+2026-11-05 20:53:41,718 | INFO | EIA Gasolina USGC: 44 observaciones, última=2026-10-30
+2026-11-05 20:53:41,718 | INFO | Descargando referencia EIA XLS: https://www.eia.gov/dnav/pet/hist_xls/EER_EPD2DXL0_PF4_RGC_DPGw.xls
+2026-11-05 20:53:41,801 | INFO | EIA Diésel USGC: 44 observaciones, última=2026-10-30
+2026-11-05 20:53:41,805 | INFO | Referencias internacionales actualizadas: 88 filas (2 benchmarks)
+2026-11-05 20:53:41,916 | INFO | Actualización completada. Filas: 20075 | Fuente: https://mem.gob.gt/wp-content/uploads/2026/10/Precios-Promedio-Nacionales-Diarios-2026-3.xlsx
